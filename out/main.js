@@ -1,125 +1,111 @@
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var DisplayObjectContainer = (function () {
-    function DisplayObjectContainer() {
-        this.children = new Array();
-    }
-    DisplayObjectContainer.prototype.addChild = function (child) {
-        if (this.children.indexOf(child) == -1) {
-            this.children.push(child);
-        }
+var _this = this;
+window.onload = function () {
+    //1.任何一个显示对象需要一个1矩阵
+    //2.把显示对象的属性转化为自己的相对矩阵
+    //3.把显示对象的相对矩阵与父对象的全局矩阵相乘，得到显示对象的全局矩阵
+    //4.对渲染上下文设置显示对象的全局矩阵
+    var canvas = document.getElementById("app"); //使用 id 来寻找 canvas 元素
+    var context2D = canvas.getContext("2d"); //得到内建的 HTML5 对象，拥有多种绘制路径、矩形、圆形、字符以及添加图像的方法
+    var stage = new DisplayObjectContainer();
+    //第二层容器
+    var panel = new DisplayObjectContainer();
+    panel.x = 120;
+    panel.y = 50;
+    panel.alpha = 0.5;
+    setInterval(function () {
+        context2D.save();
+        context2D.clearRect(0, 0, canvas.width, canvas.height); //在显示图片之前先清屏，将之前帧的图片去掉,清屏范围最好设置成画布的宽与高
+        stage.draw(context2D); //最外层开始画
+        context2D.restore();
+    }, 50);
+    var list = new DisplayObjectContainer();
+    list.addEventListener("onmousemove", function (e) {
+        var dy = currentY - lastY;
+        list.y = list.y + dy;
+    }, _this, false);
+    /*
+    //模拟TextField与Bitmap
+    */
+    //文字
+    var button = new Button();
+    button.x = 10;
+    button.y = 30;
+    button.text = "点我";
+    button.color = "#FF0000";
+    button.size = 20;
+    button.enable = true;
+    button.addEventListener("onclick", function () {
+        button.text = "Hello world!";
+    }, _this, false);
+    var word2 = new TextField();
+    word2.text = "第二层容器";
+    word2.color = "#0000FF";
+    word2.size = 30;
+    //图片
+    var avater = new Bitmap();
+    avater.image.src = "pic.png";
+    //加载完图片资源
+    avater.image.onload = function () {
+        list.addChild(avater);
+        list.addChild(button);
+        panel.addChild(word2);
+        stage.addChild(list);
+        stage.addChild(panel);
+        //stage.removeChild(panel);
     };
-    DisplayObjectContainer.prototype.draw = function (canvas) {
-        for (var _i = 0, _a = this.children; _i < _a.length; _i++) {
-            var child = _a[_i];
-            child.draw(canvas);
-        }
+    //记录位置
+    var currentX;
+    var currentY;
+    var lastX;
+    var lastY;
+    var isMouseDown = false; //检测鼠标是否按下
+    var hitResult; //检测是否点到控件
+    window.onmousedown = function (e) {
+        isMouseDown = true;
+        var targetDisplayObjectArray = EventManager.getInstance().targetDisplayObjcetArray;
+        targetDisplayObjectArray.splice(0, targetDisplayObjectArray.length);
+        hitResult = stage.hitTest(e.offsetX, e.offsetY);
+        currentX = e.offsetX;
+        currentY = e.offsetY;
     };
-    DisplayObjectContainer.prototype.removeChild = function (child) {
-        for (var _i = 0, _a = this.children; _i < _a.length; _i++) {
-            var element = _a[_i];
-            if (element == child) {
-                var index = this.children.indexOf(child);
-                this.children.splice(index);
-                return;
+    window.onmousemove = function (e) {
+        var targetDisplayObjcetArray = EventManager.getInstance().targetDisplayObjcetArray;
+        lastX = currentX;
+        lastY = currentY;
+        currentX = e.offsetX;
+        currentY = e.offsetY;
+        if (isMouseDown) {
+            for (var i = 0; i < targetDisplayObjcetArray.length; i++) {
+                for (var _i = 0, _a = targetDisplayObjcetArray[i].eventArray; _i < _a.length; _i++) {
+                    var event_1 = _a[_i];
+                    if (event_1.type.match("onmousemove") && event_1.ifCapture) {
+                        event_1.func(e);
+                    }
+                }
+            }
+            for (var i = targetDisplayObjcetArray.length - 1; i >= 0; i--) {
+                for (var _b = 0, _c = targetDisplayObjcetArray[i].eventArray; _b < _c.length; _b++) {
+                    var event_2 = _c[_b];
+                    if (event_2.type.match("onmousemove") && !event_2.ifCapture) {
+                        event_2.func(e);
+                    }
+                }
             }
         }
     };
-    return DisplayObjectContainer;
-}());
-var DisplayObject = (function () {
-    function DisplayObject() {
-        this.x = 0;
-        this.y = 0;
-        this.scaleX = 1;
-        this.scaleY = 1;
-        this.alpha = 1;
-    }
-    DisplayObject.prototype.draw = function (canvas) { };
-    return DisplayObject;
-}());
-var Bitmap = (function (_super) {
-    __extends(Bitmap, _super);
-    function Bitmap() {
-        _super.call(this);
-        this.image = null;
-        this.hasLoaded = false;
-        this._src = "";
-        this.image = new Image();
-    }
-    Object.defineProperty(Bitmap.prototype, "src", {
-        set: function (src) {
-            this._src = "/resource/assets/" + src;
-            this.hasLoaded = false;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Bitmap.prototype.draw = function (canvas) {
-        var _this = this;
-        canvas.globalAlpha = this.alpha;
-        if (this.hasLoaded) {
-            canvas.drawImage(this.image, this.x, this.y, this.image.width * this.scaleX, this.image.height * this.scaleY);
-        }
-        else {
-            this.image.src = this._src;
-            this.image.onload = function () {
-                canvas.drawImage(_this.image, _this.x, _this.y, _this.image.width * _this.scaleX, _this.image.height * _this.scaleY);
-                _this.hasLoaded = true;
-            };
+    window.onmouseup = function (e) {
+        isMouseDown = false;
+        var targetDisplayObjcetArray = EventManager.getInstance().targetDisplayObjcetArray;
+        targetDisplayObjcetArray.splice(0, targetDisplayObjcetArray.length);
+        var newHitRusult = stage.hitTest(e.offsetX, e.offsetY);
+        for (var i = targetDisplayObjcetArray.length - 1; i >= 0; i--) {
+            for (var _i = 0, _a = targetDisplayObjcetArray[i].eventArray; _i < _a.length; _i++) {
+                var event_3 = _a[_i];
+                if (event_3.type.match("onclick") && newHitRusult == hitResult) {
+                    event_3.func(e);
+                }
+            }
         }
     };
-    return Bitmap;
-}(DisplayObject));
-var TextField = (function (_super) {
-    __extends(TextField, _super);
-    function TextField() {
-        _super.apply(this, arguments);
-        this.text = "";
-        this.color = "";
-        this.fontSize = 10;
-        this.font = "Georgia";
-    }
-    TextField.prototype.draw = function (canvas) {
-        canvas.fillStyle = this.color;
-        canvas.globalAlpha = this.alpha;
-        canvas.font = this.fontSize.toString() + "px " + this.font.toString();
-        canvas.fillText(this.text, this.x, this.y + this.fontSize);
-    };
-    return TextField;
-}(DisplayObject));
-window.onload = function () {
-    var canvas = document.getElementById("myCanvas");
-    var canvas2D = canvas.getContext("2d");
-    var background = new DisplayObjectContainer();
-    var text = new TextField();
-    text.x = 0;
-    text.y = 0;
-    //text.scaleX = 3;
-    //text.scaleY = 3;
-    text.alpha = 0.5;
-    text.color = "#FF0000";
-    text.fontSize = 30;
-    text.font = "Arial";
-    text.text = "Hello World!";
-    var bitmap = new Bitmap();
-    bitmap.x = 0;
-    bitmap.y = 0;
-    bitmap.alpha = 0.8;
-    bitmap.scaleX = 0.5;
-    bitmap.scaleY = 0.5;
-    bitmap.src = "pic.png";
-    background.addChild(bitmap);
-    background.addChild(text);
-    background.draw(canvas2D);
-    setInterval(function () {
-        canvas2D.clearRect(0, 0, canvas.width, canvas.height);
-        text.y++;
-        bitmap.x++;
-        background.draw(canvas2D);
-    }, 30);
 };
 //# sourceMappingURL=main.js.map
